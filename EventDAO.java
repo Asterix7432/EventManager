@@ -15,7 +15,13 @@ public class EventDAO {
     public boolean createEvent(Event event) {
         String sql = "INSERT INTO events (name, event_date, location, description, capacity, current_attendees, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot create event.");
+            return false;
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, event.getName());
             pstmt.setDate(2, Date.valueOf(event.getDate()));
             pstmt.setString(3, event.getLocation());
@@ -45,7 +51,13 @@ public class EventDAO {
         List<Event> events = new ArrayList<>();
         String sql = "SELECT * FROM events ORDER BY event_date ASC";
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql);
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot retrieve events.");
+            return events;
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
             
             while (rs.next()) {
@@ -71,7 +83,13 @@ public class EventDAO {
     public Event getEventById(int id) {
         String sql = "SELECT * FROM events WHERE id = ?";
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot retrieve event by ID.");
+            return null;
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, id);
             
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -99,7 +117,13 @@ public class EventDAO {
     public boolean updateEvent(Event event) {
         String sql = "UPDATE events SET name = ?, event_date = ?, location = ?, description = ?, capacity = ?, current_attendees = ?, status = ? WHERE id = ?";
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot update event.");
+            return false;
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, event.getName());
             pstmt.setDate(2, Date.valueOf(event.getDate()));
             pstmt.setString(3, event.getLocation());
@@ -121,7 +145,13 @@ public class EventDAO {
     public boolean deleteEvent(int id) {
         String sql = "DELETE FROM events WHERE id = ?";
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot delete event.");
+            return false;
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, id);
             
             int affectedRows = pstmt.executeUpdate();
@@ -137,7 +167,13 @@ public class EventDAO {
         List<Event> events = new ArrayList<>();
         String sql = "SELECT * FROM events WHERE name LIKE ? ORDER BY event_date ASC";
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot search events by name.");
+            return events;
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, "%" + name + "%");
             
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -166,7 +202,13 @@ public class EventDAO {
         List<Event> events = new ArrayList<>();
         String sql = "SELECT * FROM events WHERE location LIKE ? ORDER BY event_date ASC";
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot search events by location.");
+            return events;
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, "%" + location + "%");
             
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -195,7 +237,13 @@ public class EventDAO {
         List<Event> events = new ArrayList<>();
         String sql = "SELECT * FROM events WHERE status = ? ORDER BY event_date ASC";
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot search events by status.");
+            return events;
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, status);
             
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -224,7 +272,13 @@ public class EventDAO {
         List<Event> events = new ArrayList<>();
         String sql = "SELECT * FROM events WHERE event_date BETWEEN ? AND ? ORDER BY event_date ASC";
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot search events by date range.");
+            return events;
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setDate(1, Date.valueOf(startDate));
             pstmt.setDate(2, Date.valueOf(endDate));
             
@@ -263,7 +317,13 @@ public class EventDAO {
             FROM events
         """;
         
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql);
+        Connection conn = dbConnection.getConnection();
+        if (conn == null) {
+            System.err.println("Database connection is not available. Cannot compute event statistics.");
+            return new EventStatistics(0, 0, 0, 0, 0, 0, 0);
+        }
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
             
             if (rs.next()) {

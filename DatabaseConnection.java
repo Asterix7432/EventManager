@@ -38,8 +38,15 @@ public class DatabaseConnection {
             String user = props.getProperty("db.user", DB_USER);
             String password = props.getProperty("db.password", DB_PASSWORD);
             
-            // Load MySQL JDBC driver
-            Class.forName("com.mysql.cj.jdbc.Driver");
+            // Try to load MySQL JDBC driver if available
+            try {
+                Class.forName("com.mysql.cj.jdbc.Driver");
+            } catch (ClassNotFoundException driverEx) {
+                System.err.println("MySQL JDBC Driver not found in classpath.");
+                System.err.println("Continuing without DB connectivity. Some features will be disabled.");
+                connection = null;
+                return;
+            }
             
             // Create connection
             connection = DriverManager.getConnection(url, user, password);
@@ -50,10 +57,6 @@ public class DatabaseConnection {
             
             System.out.println("Database connection established successfully!");
             
-        } catch (ClassNotFoundException e) {
-            System.err.println("MySQL JDBC Driver not found. Please add mysql-connector-java to your classpath.");
-            System.err.println("Download from: https://dev.mysql.com/downloads/connector/j/");
-            e.printStackTrace();
         } catch (SQLException e) {
             System.err.println("Database connection failed: " + e.getMessage());
             System.err.println("Please ensure MySQL is running and the database credentials are correct.");
