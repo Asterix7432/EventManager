@@ -4,7 +4,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 public class DatabaseConnection {
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/eventmanager";
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/eventmanager?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&autoReconnect=true&useUnicode=true&characterEncoding=UTF-8";
     private static final String DB_USER = "root";
     private static final String DB_PASSWORD = "password";
     private static final String CONFIG_FILE = "database.properties";
@@ -48,20 +48,61 @@ public class DatabaseConnection {
                 return;
             }
             
-            // Create connection
-            connection = DriverManager.getConnection(url, user, password);
+            // Attempt primary connection; if DB missing, fall back to server-level connection, bootstrap schema, and continue
+            try {
+                connection = DriverManager.getConnection(url, user, password);
+            } catch (SQLException primaryEx) {
+                if (isUnknownDatabaseError(primaryEx)) {
+                    String baseUrl = deriveServerUrl(url);
+                    System.err.println("Database 'eventmanager' not found. Attempting to create it...");
+                    try {
+                        connection = DriverManager.getConnection(baseUrl, user, password);
+                        createDatabaseIfNotExists();
+                        createTableIfNotExists();
+                        System.out.println("Database and tables created successfully.");
+                    } catch (SQLException bootstrapEx) {
+                        System.err.println("Failed to bootstrap database: " + bootstrapEx.getMessage());
+                        connection = null;
+                        return;
+                    }
+                } else {
+                    throw primaryEx;
+                }
+            }
             
-            // Create database and table if they don't exist
-            createDatabaseIfNotExists();
-            createTableIfNotExists();
+            // Ensure schema exists even if primary connection succeeded (idempotent)
+            try {
+                createDatabaseIfNotExists();
+                createTableIfNotExists();
+            } catch (SQLException ensureEx) {
+                System.err.println("Schema ensure failed: " + ensureEx.getMessage());
+            }
             
             System.out.println("Database connection established successfully!");
             
         } catch (SQLException e) {
             System.err.println("Database connection failed: " + e.getMessage());
             System.err.println("Please ensure MySQL is running and the database credentials are correct.");
-            e.printStackTrace();
+            connection = null;
         }
+    }
+
+    private boolean isUnknownDatabaseError(SQLException e) {
+        // MySQL error code 1049, SQLState 42000 for unknown database
+        return ("42000".equals(e.getSQLState()) || e.getErrorCode() == 1049) &&
+               (e.getMessage() != null && e.getMessage().toLowerCase().contains("unknown database"));
+    }
+
+    private String deriveServerUrl(String url) {
+        // Convert jdbc:mysql://host:port/db?params -> jdbc:mysql://host:port/?params
+        int qm = url.indexOf('?');
+        String params = qm >= 0 ? url.substring(qm) : "";
+        String withoutParams = qm >= 0 ? url.substring(0, qm) : url;
+        int lastSlash = withoutParams.lastIndexOf('/');
+        if (lastSlash > "jdbc:mysql://".length() - 1) {
+            return withoutParams.substring(0, lastSlash + 1) + params; // keep trailing slash
+        }
+        return url; // fallback; shouldn't happen
     }
     
     private void createDatabaseIfNotExists() throws SQLException {
