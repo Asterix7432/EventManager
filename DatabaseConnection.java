@@ -4,7 +4,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 public class DatabaseConnection {
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/eventmanager";
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/eventmanager?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
     private static final String DB_USER = "root";
     private static final String DB_PASSWORD = "password";
     private static final String CONFIG_FILE = "database.properties";
@@ -37,29 +37,61 @@ public class DatabaseConnection {
             String url = props.getProperty("db.url", DB_URL);
             String user = props.getProperty("db.user", DB_USER);
             String password = props.getProperty("db.password", DB_PASSWORD);
+            boolean fallbackToH2 = Boolean.parseBoolean(props.getProperty("db.fallbackToH2", "false"));
+            String h2Url = props.getProperty("db.h2.url", "jdbc:h2:./.h2/eventmanager;MODE=MySQL;DATABASE_TO_UPPER=false;AUTO_SERVER=TRUE");
+            String h2User = props.getProperty("db.h2.user", "sa");
+            String h2Password = props.getProperty("db.h2.password", "");
             
             // Try to load MySQL JDBC driver if available
+            boolean mysqlAvailable = false;
             try {
                 Class.forName("com.mysql.cj.jdbc.Driver");
+                mysqlAvailable = true;
             } catch (ClassNotFoundException driverEx) {
                 System.err.println("MySQL JDBC Driver not found in classpath.");
-                System.err.println("Continuing without DB connectivity. Some features will be disabled.");
-                connection = null;
-                return;
             }
-            
-            // Create connection
-            connection = DriverManager.getConnection(url, user, password);
-            
-            // Create database and table if they don't exist
-            createDatabaseIfNotExists();
-            createTableIfNotExists();
-            
-            System.out.println("Database connection established successfully!");
+
+            SQLException lastError = null;
+            if (mysqlAvailable) {
+                try {
+                    // First try direct connection (createDatabaseIfNotExist may create schema)
+                    connection = DriverManager.getConnection(url, user, password);
+                    // Ensure schema and tables
+                    createDatabaseIfNotExists();
+                    createTableIfNotExists();
+                    System.out.println("Database connection (MySQL) established successfully!");
+                    return;
+                } catch (SQLException e) {
+                    lastError = e;
+                    System.err.println("MySQL connection attempt failed: " + e.getMessage());
+                }
+            }
+
+            if (fallbackToH2) {
+                try {
+                    Class.forName("org.h2.Driver");
+                    connection = DriverManager.getConnection(h2Url, h2User, h2Password);
+                    createTableIfNotExists();
+                    System.out.println("Database connection (H2 fallback) established successfully!");
+                    return;
+                } catch (ClassNotFoundException e) {
+                    System.err.println("H2 JDBC Driver not found in classpath.");
+                } catch (SQLException e) {
+                    lastError = e;
+                    System.err.println("H2 connection attempt failed: " + e.getMessage());
+                }
+            }
+
+            // If we reach here, neither MySQL nor H2 connected
+            if (lastError != null) {
+                throw lastError;
+            } else {
+                throw new SQLException("No JDBC driver available for MySQL or H2.");
+            }
             
         } catch (SQLException e) {
             System.err.println("Database connection failed: " + e.getMessage());
-            System.err.println("Please ensure MySQL is running and the database credentials are correct.");
+            System.err.println("Ensure MySQL is running or enable H2 fallback in database.properties.");
             e.printStackTrace();
         }
     }
