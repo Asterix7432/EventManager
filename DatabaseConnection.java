@@ -25,10 +25,11 @@ public class DatabaseConnection {
     
     private void initializeDatabase() {
         try {
-            // Load database configuration from properties file if it exists
+            // Load database configuration from properties file
             Properties props = new Properties();
             try {
                 props.load(new FileInputStream(CONFIG_FILE));
+                System.out.println("Loaded database configuration from " + CONFIG_FILE);
             } catch (IOException e) {
                 // Use default configuration if file doesn't exist
                 System.out.println("No database.properties file found, using default configuration");
@@ -38,29 +39,41 @@ public class DatabaseConnection {
             String user = props.getProperty("db.user", DB_USER);
             String password = props.getProperty("db.password", DB_PASSWORD);
             
-            // Try to load MySQL JDBC driver if available
+            System.out.println("Attempting to connect to database: " + url);
+            
+            // Load MySQL JDBC driver - MANDATORY
             try {
                 Class.forName("com.mysql.cj.jdbc.Driver");
+                System.out.println("MySQL JDBC Driver loaded successfully");
             } catch (ClassNotFoundException driverEx) {
-                System.err.println("MySQL JDBC Driver not found in classpath.");
-                System.err.println("Continuing without DB connectivity. Some features will be disabled.");
-                connection = null;
-                return;
+                String errorMsg = "FATAL ERROR: MySQL JDBC Driver not found in classpath!\n" +
+                                 "Please ensure mysql-connector-j.jar is in the classpath.\n" +
+                                 "The application cannot run without database connectivity.";
+                System.err.println(errorMsg);
+                throw new RuntimeException(errorMsg, driverEx);
             }
             
-            // Create connection
+            // Create connection - MANDATORY
             connection = DriverManager.getConnection(url, user, password);
+            System.out.println("Database connection established successfully!");
             
             // Create database and table if they don't exist
             createDatabaseIfNotExists();
             createTableIfNotExists();
             
-            System.out.println("Database connection established successfully!");
+            System.out.println("Database initialization complete!");
             
         } catch (SQLException e) {
-            System.err.println("Database connection failed: " + e.getMessage());
-            System.err.println("Please ensure MySQL is running and the database credentials are correct.");
+            String errorMsg = "FATAL ERROR: Database connection failed!\n" +
+                             "Error: " + e.getMessage() + "\n" +
+                             "Please ensure:\n" +
+                             "1. MySQL server is running\n" +
+                             "2. Database credentials in database.properties are correct\n" +
+                             "3. Database 'eventmanager' exists or can be created\n" +
+                             "The application cannot run without database connectivity.";
+            System.err.println(errorMsg);
             e.printStackTrace();
+            throw new RuntimeException(errorMsg, e);
         }
     }
     
@@ -101,10 +114,14 @@ public class DatabaseConnection {
     public Connection getConnection() {
         try {
             if (connection == null || connection.isClosed()) {
-                initializeDatabase();
+                String errorMsg = "FATAL ERROR: Database connection is not available!";
+                System.err.println(errorMsg);
+                throw new RuntimeException(errorMsg);
             }
         } catch (SQLException e) {
-            System.err.println("Error checking connection: " + e.getMessage());
+            String errorMsg = "FATAL ERROR: Cannot verify database connection: " + e.getMessage();
+            System.err.println(errorMsg);
+            throw new RuntimeException(errorMsg, e);
         }
         return connection;
     }

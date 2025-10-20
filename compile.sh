@@ -1,10 +1,22 @@
 #!/bin/bash
 
-echo "Compiling Event Management System (MySQL Only)..."
+echo "Compiling Event Management System (MySQL)..."
 
 JAR_DIR=".lib"
 MYSQL_JAR="$JAR_DIR/mysql-connector-j.jar"
 MYSQL_MAVEN_URL="https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/9.0.0/mysql-connector-j-9.0.0.jar"
+
+# Check if mysql-connector-j-9.4.0 directory exists and use it
+if [ -d "mysql-connector-j-9.4.0" ]; then
+    echo "Found mysql-connector-j-9.4.0 directory"
+    # Find the JAR file in the directory
+    FOUND_JAR=$(find mysql-connector-j-9.4.0 -name "mysql-connector-j-*.jar" 2>/dev/null | head -n 1)
+    if [ -n "$FOUND_JAR" ]; then
+        echo "Using MySQL connector from: $FOUND_JAR"
+        mkdir -p "$JAR_DIR"
+        cp "$FOUND_JAR" "$MYSQL_JAR"
+    fi
+fi
 
 mkdir -p "$JAR_DIR"
 
@@ -24,33 +36,33 @@ fi
 CP="."
 if [ -f "$MYSQL_JAR" ]; then
   CP="$CP:$MYSQL_JAR"
+else
+  echo "WARNING: MySQL Connector/J not found!"
+  echo "Please download it manually or ensure MySQL driver is available."
 fi
 
-javac --release 21 -cp "$CP" *.java
+echo "Compiling Java files..."
+javac -cp "$CP" *.java
 
 if [ $? -eq 0 ]; then
     echo "Compilation successful!"
     echo ""
-    echo "Available applications:"
-    echo "1. Console version: java EventManager"
-    echo "2. GUI version: java EventManagerGUI"
+    echo "Database connection is MANDATORY for this application."
     echo ""
     echo "Prerequisites:"
-    echo "  - MySQL Server running"
-    echo "  - MySQL Connector/J in classpath"
+    echo "  1. MySQL Server must be running"
+    echo "  2. Database configured in database.properties"
+    echo "  3. MySQL Connector/J in classpath"
+    echo ""
+    echo "To run the application:"
+    if [ -f "$MYSQL_JAR" ]; then
+      echo "  java -cp '.:$MYSQL_JAR' Main"
+    else
+      echo "  java -cp '.:/path/to/mysql-connector-j.jar' Main"
+    fi
     echo ""
     echo "Database Setup:"
     echo "  Run: ./setup_database.sh"
-    echo ""
-    echo "To run with MySQL Connector:"
-    if [ -f "$MYSQL_JAR" ]; then
-      echo "  java -cp '.:$MYSQL_JAR' EventManager"
-      echo "  java -cp '.:$MYSQL_JAR' EventManagerGUI"
-    else
-      echo "  Place mysql-connector-j.jar on classpath. Example:"
-      echo "  java -cp '.:path/to/mysql-connector-j-x.y.z.jar' EventManager"
-      echo "  java -cp '.:path/to/mysql-connector-j-x.y.z.jar' EventManagerGUI"
-    fi
 else
     echo "Compilation failed!"
     exit 1
